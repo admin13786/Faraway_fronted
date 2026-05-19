@@ -40,7 +40,8 @@ jobs:
             --exclude='.github' \
             --exclude='node_modules' \
             --exclude='dist' \
-            -czf web-release.tar.gz .
+            -czf "$RUNNER_TEMP/web-release.tar.gz" .
+          cp "$RUNNER_TEMP/web-release.tar.gz" web-release.tar.gz
 
       - name: Upload release to Aliyun
         uses: appleboy/scp-action@v0.1.7
