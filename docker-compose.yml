@@ -1,0 +1,23 @@
+services:
+  web:
+    image: faraway-web:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NODE_IMAGE: "${NODE_IMAGE:-node:20-alpine}"
+        NGINX_IMAGE: "${NGINX_IMAGE:-nginx:1.27-alpine}"
+        VITE_API_BASE_URL: "${VITE_API_BASE_URL:-}"
+    container_name: faraway-web
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    environment:
+      BACKEND_UPSTREAM: "${BACKEND_UPSTREAM:-faraway-backend:8000}"
+    networks:
+      - faraway-net
+    restart: unless-stopped
+
+networks:
+  faraway-net:
+    external: true
+    name: faraway-net
