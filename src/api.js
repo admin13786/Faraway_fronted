@@ -109,6 +109,7 @@ export const api = {
   updateProfile: (data) => request('/api/user/profile', { method: 'PUT', data }),
   stats: () => request('/api/user/stats'),
   feed: () => request('/api/home/feed'),
+  recordRecommendationEvent: (data) => request('/api/recommendation/events', { method: 'POST', data }),
   strategies: (data = {}) => request('/api/strategies', { data }),
   posts: (data = {}) => request('/api/posts', { data }),
   strategyDetail: (id) => request(`/api/strategies/${id}`),

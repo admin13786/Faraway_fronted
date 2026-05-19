@@ -113,11 +113,17 @@
             class="destination-card"
             :class="{ clickable: canOpenContent(item) }"
             @click="openContent(item)"
+            @contextmenu.prevent="dislikeContent(item)"
+            @pointerdown="startDislikePress(item)"
+            @pointerup="cancelDislikePress"
+            @pointerleave="cancelDislikePress"
+            @pointercancel="cancelDislikePress"
           >
             <div class="destination-media">
               <video v-if="isVlog(item) && getVideoUrl(item)" :src="getVideoUrl(item)" :poster="getCover(item, index)" muted loop controls />
               <img v-else :src="getCover(item, index)" alt="" />
               <span>{{ isVlog(item) ? 'Vlog' : '攻略' }}</span>
+              <button class="dislike-chip" type="button" title="不喜欢，减少类似推荐" @click.stop="dislikeContent(item)">不喜欢</button>
             </div>
             <div class="destination-body">
               <small>{{ item.destination || item.location || item.region || '未知目的地' }}</small>
@@ -151,16 +157,44 @@
             正文
             <textarea v-model.trim="editor.content" required rows="8" placeholder="写下路线、预算、避坑点、拍照位置和真实体验" />
           </label>
-          <label v-if="editor.type === 'strategy'">
-            图片上传
-            <input type="file" accept="image/*" multiple @change="handleImageFiles" />
-          </label>
+          <div v-if="editor.type === 'strategy'" class="photo-uploader">
+            <div class="uploader-head">
+              <div>
+                <span>图片上传</span>
+                <small>{{ editor.imageList.length }}/9，点击图片可设为封面</small>
+              </div>
+              <label class="upload-trigger" :class="{ disabled: !canAddMoreImages }">
+                选择图片
+                <input type="file" accept="image/*" multiple :disabled="!canAddMoreImages" @change="handleImageFiles" />
+              </label>
+            </div>
+            <div class="photo-grid" :class="{ empty: !editor.imageList.length }">
+              <button
+                v-for="(image, index) in editor.imageList"
+                :key="image.id || image.url"
+                class="photo-tile"
+                :class="{ cover: image.url === editor.coverUrl }"
+                type="button"
+                @click="setCoverImage(index)"
+              >
+                <img :src="image.url" alt="" />
+                <span class="cover-mark">{{ image.url === editor.coverUrl ? '封面' : `图 ${index + 1}` }}</span>
+                <span class="remove-photo" @click.stop="removeImage(index)">删除</span>
+              </button>
+              <label v-if="canAddMoreImages" class="photo-tile add-photo">
+                <input type="file" accept="image/*" multiple @change="handleImageFiles" />
+                <strong>+</strong>
+                <span>{{ editor.imageList.length ? '继续加图' : '添加图片' }}</span>
+              </label>
+              <p v-if="!editor.imageList.length" class="upload-empty">像小红书一样添加多张真实旅行照片，第一张默认作为封面。</p>
+            </div>
+          </div>
           <label v-else>
             视频上传
             <input type="file" accept="video/*" @change="handleVideoFile" />
           </label>
           <div class="upload-preview">
-            <span v-for="image in editor.imageList" :key="image.url">{{ image.url }}</span>
+            <span v-for="image in editor.imageList" :key="`url-${image.url}`">{{ image.url }}</span>
             <span v-if="editor.videoUrl">{{ editor.videoUrl }}</span>
           </div>
           <div class="button-row">
@@ -172,9 +206,20 @@
 
         <article class="preview-travel-card">
           <div class="preview-cover">
-            <img v-if="editor.imageList[0]" :src="editor.imageList[0].url" alt="" />
+            <img v-if="previewCover" :src="previewCover" alt="" />
             <video v-else-if="editor.videoUrl" :src="editor.videoUrl" controls />
             <img v-else :src="fallbackCovers[2]" alt="" />
+          </div>
+          <div v-if="editor.type === 'strategy' && editor.imageList.length > 1" class="preview-strip">
+            <button
+              v-for="(image, index) in editor.imageList"
+              :key="`preview-${image.url}`"
+              type="button"
+              :class="{ active: image.url === editor.coverUrl }"
+              @click="setCoverImage(index)"
+            >
+              <img :src="image.url" alt="" />
+            </button>
           </div>
           <div>
             <p class="eyebrow">Live preview</p>
@@ -359,9 +404,22 @@
       <div v-if="selectedContent" class="detail-overlay" @click.self="selectedContent = null">
         <section class="content-detail-panel" role="dialog" aria-modal="true">
           <button class="detail-close" type="button" @click="selectedContent = null">关闭</button>
-          <div class="detail-cover">
-            <video v-if="isVlog(selectedContent) && getVideoUrl(selectedContent)" :src="getVideoUrl(selectedContent)" :poster="getCover(selectedContent, 0)" controls />
-            <img v-else :src="getCover(selectedContent, 0)" alt="" />
+          <div class="detail-media">
+            <div class="detail-cover">
+              <video v-if="isVlog(selectedContent) && getVideoUrl(selectedContent)" :src="getVideoUrl(selectedContent)" :poster="getCover(selectedContent, 0)" controls />
+              <img v-else :src="selectedGalleryImage" alt="" />
+            </div>
+            <div v-if="selectedGallery.length > 1" class="detail-thumbs">
+              <button
+                v-for="(image, index) in selectedGallery"
+                :key="`${image}-${index}`"
+                type="button"
+                :class="{ active: selectedGalleryIndex === index }"
+                @click="selectedGalleryIndex = index"
+              >
+                <img :src="image" alt="" />
+              </button>
+            </div>
           </div>
           <div class="detail-body">
             <p class="eyebrow">{{ isVlog(selectedContent) ? 'Travel Vlog' : 'Travel strategy' }}</p>
@@ -393,11 +451,9 @@ const navItems = [
 
 const fallbackCovers = [
   '/static/cover/city-beijing.jpg',
-  '/static/bg/home-hero.jpg',
   '/static/cover/city-shanghai.jpg',
   '/static/cover/city-guangzhou.jpg',
-  '/static/cover/city-shenzhen.jpg',
-  '/static/cover/preview-default.jpg'
+  '/static/cover/city-shenzhen.jpg'
 ]
 
 const localCityCovers = {
@@ -407,15 +463,15 @@ const localCityCovers = {
   深圳: '/static/cover/city-shenzhen.jpg'
 }
 
-const androidPackageAvailable = false
+const androidPackageAvailable = true
 
 const sampleTrips = [
-  { id: 'sample-1', title: '在洱海边住三晚，慢慢看日落', destination: '大理', description: '适合第一次去云南的人，路线轻松，重点是骑行、咖啡馆和海西日落。', contentType: 'strategy', coverUrl: fallbackCovers[0] },
-  { id: 'sample-2', title: '川西小环线的雪山窗口期', destination: '川西', description: '把天气、路况、住宿和拍照点放在同一条路线里，适合 4-5 天出发。', contentType: 'strategy', coverUrl: fallbackCovers[3] },
-  { id: 'sample-3', title: '海岛 Vlog：清晨出海和夜市', location: '万宁', description: '用一天时间记录冲浪、椰林公路、海鲜夜市和民宿露台。', type: 'vlog', coverUrl: fallbackCovers[5] }
+  { id: 'sample-1', title: '北京3天旅行攻略：故宫到三里屯', destination: '北京', description: '适合第一次看北京城市文化的人，重点是中轴线、胡同散步、夜景和美食。', contentType: 'strategy', coverUrl: localCityCovers.北京 },
+  { id: 'sample-2', title: '上海3天旅行攻略：外滩到武康路', destination: '上海', description: '把外滩、陆家嘴、街区漫步和咖啡馆放进一条轻松路线，适合周末出发。', contentType: 'strategy', coverUrl: localCityCovers.上海 },
+  { id: 'sample-3', title: '广州 Vlog：珠江新城和早茶路线', location: '广州', description: '记录广州塔、珠江夜景、老城区散步和一顿慢慢吃的早茶。', type: 'vlog', coverUrl: localCityCovers.广州 }
 ]
 
-const heroImage = fallbackCovers[1]
+const heroImage = '/static/bg/home-hero.jpg'
 const activeTab = ref('explore')
 const authMode = ref('login')
 const keyword = ref('')
@@ -437,6 +493,9 @@ const showMatchHistory = ref(false)
 const editingContent = ref(null)
 const matchRating = ref(0)
 const matchRatingComment = ref('')
+const selectedGalleryIndex = ref(0)
+const dislikePressTimer = ref(null)
+const suppressNextOpen = ref(false)
 
 const authForm = reactive({ username: '', password: '', nickname: '' })
 const editor = reactive({
@@ -458,6 +517,16 @@ const matchForm = reactive({
 const isLoggedIn = computed(() => !!sessionToken.value)
 const currentSection = computed(() => navItems.find((item) => item.key === activeTab.value) || navItems[0])
 const spotlightItems = computed(() => (exploreItems.value.length ? exploreItems.value : sampleTrips))
+const canAddMoreImages = computed(() => editor.type === 'strategy' && editor.imageList.length < 9)
+const previewCover = computed(() => editor.coverUrl || editor.imageList[0]?.url || '')
+const selectedGallery = computed(() => {
+  if (!selectedContent.value || isVlog(selectedContent.value)) {
+    return []
+  }
+  const images = normalizeImageList(selectedContent.value)
+  return images.length ? images : [getCover(selectedContent.value, 0)].filter(Boolean)
+})
+const selectedGalleryImage = computed(() => selectedGallery.value[selectedGalleryIndex.value] || selectedGallery.value[0] || getCover(selectedContent.value, 0))
 const realtimeDescription = computed(() => {
   if (realtimeState.value.candidate) return '已经找到候选搭子，请确认是否继续。'
   if (realtimeState.value.pair) return '双方已确认，可以准备见面。'
@@ -505,6 +574,11 @@ function canOpenContent(item) {
 }
 
 async function openContent(item) {
+  if (suppressNextOpen.value) {
+    suppressNextOpen.value = false
+    return
+  }
+  selectedGalleryIndex.value = 0
   if (!canOpenContent(item)) {
     selectedContent.value = item
     return
@@ -516,10 +590,77 @@ async function openContent(item) {
   }, '内容详情加载失败')
 }
 
+function contentTargetType(item) {
+  return isVlog(item) ? 'post' : 'strategy'
+}
+
+function removeContentFromExplore(item) {
+  const targetType = contentTargetType(item)
+  exploreItems.value = exploreItems.value.filter((entry) => {
+    return !(String(entry.id) === String(item.id) && contentTargetType(entry) === targetType)
+  })
+  if (selectedContent.value && String(selectedContent.value.id) === String(item.id) && contentTargetType(selectedContent.value) === targetType) {
+    selectedContent.value = null
+  }
+}
+
+async function dislikeContent(item) {
+  if (!isLoggedIn.value) {
+    activeTab.value = 'auth'
+    globalError.value = '登录后可以反馈不喜欢，系统会减少类似推荐。'
+    return
+  }
+  if (!canOpenContent(item)) return
+  removeContentFromExplore(item)
+  await run(async () => {
+    await api.recordRecommendationEvent({
+      eventType: 'dislike',
+      targetType: contentTargetType(item),
+      targetId: String(item.id),
+      traceId: item.recommendationTraceId || '',
+      metadata: {
+        source: 'web_explore_dislike',
+        reason: 'not_interested',
+        destination: item.destination || item.location || '',
+        title: item.title || ''
+      }
+    })
+    globalError.value = '已减少此类推荐，后续推荐会参考这个反馈。'
+  }, '反馈失败')
+}
+
+function startDislikePress(item) {
+  cancelDislikePress()
+  dislikePressTimer.value = window.setTimeout(() => {
+    suppressNextOpen.value = true
+    dislikeContent(item)
+  }, 700)
+}
+
+function cancelDislikePress() {
+  if (dislikePressTimer.value) {
+    window.clearTimeout(dislikePressTimer.value)
+    dislikePressTimer.value = null
+  }
+}
+
 function getCover(item, index = 0) {
   const cover = item.coverUrl || item.imageList?.[0]?.url || item.rawCoverUrl || ''
   if (cover && !isSlowRemoteImage(cover)) return cover
   return localCityCovers[item.destination || item.location] || fallbackCovers[index % fallbackCovers.length]
+}
+
+function normalizeImageList(item) {
+  if (!item || !Array.isArray(item.imageList)) {
+    return []
+  }
+  return item.imageList
+    .map((entry) => {
+      if (!entry) return ''
+      if (typeof entry === 'string') return entry
+      return entry.rawUrl || entry.url || ''
+    })
+    .filter(Boolean)
 }
 
 function isSlowRemoteImage(url) {
@@ -629,12 +770,13 @@ async function loadExplore() {
 }
 
 async function handleImageFiles(event) {
-  const files = Array.from(event.target.files || [])
+  const files = Array.from(event.target.files || []).slice(0, 9 - editor.imageList.length)
   for (const file of files) {
     const uploaded = await uploadFile(file, 'image')
-    editor.imageList.push({ url: uploaded.url })
+    editor.imageList.push({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, url: uploaded.url })
   }
   editor.coverUrl = editor.imageList[0]?.url || editor.coverUrl
+  event.target.value = ''
 }
 
 async function handleVideoFile(event) {
@@ -642,6 +784,22 @@ async function handleVideoFile(event) {
   if (!file) return
   const uploaded = await uploadFile(file, 'video')
   editor.videoUrl = uploaded.url
+  event.target.value = ''
+}
+
+function setCoverImage(index) {
+  const image = editor.imageList[index]
+  if (image?.url) {
+    editor.coverUrl = image.url
+  }
+}
+
+function removeImage(index) {
+  const removed = editor.imageList[index]
+  editor.imageList.splice(index, 1)
+  if (removed?.url === editor.coverUrl) {
+    editor.coverUrl = editor.imageList[0]?.url || ''
+  }
 }
 
 function buildStrategyPayload(status = 'published') {
@@ -710,7 +868,7 @@ function editContent(item) {
   editor.location = item.destination || item.location || ''
   editor.content = item.content || ''
   editor.coverUrl = item.rawCoverUrl || item.coverUrl || ''
-  editor.imageList = (item.imageList || []).map((entry) => ({ url: entry.rawUrl || entry.url || '' }))
+  editor.imageList = (item.imageList || []).map((entry) => ({ id: `${Date.now()}-${Math.random().toString(16).slice(2)}`, url: entry.rawUrl || entry.url || '' }))
   editor.videoUrl = getVideoUrl({ mediaList: (item.mediaList || []).map((entry) => ({ ...entry, url: entry.rawUrl || entry.url })) })
   activeTab.value = 'publish'
 }

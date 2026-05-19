@@ -503,6 +503,29 @@ label {
   font-weight: 900;
 }
 
+.dislike-chip {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(12, 35, 37, 0.72);
+  color: #fffaf1;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.destination-card:hover .dislike-chip,
+.destination-card:focus-within .dislike-chip {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .destination-body {
   padding: 18px;
 }
@@ -565,6 +588,12 @@ label {
   font-weight: 800;
 }
 
+.detail-media {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
 .detail-cover {
   min-height: 280px;
   border-radius: 22px;
@@ -574,6 +603,33 @@ label {
 
 .detail-cover img,
 .detail-cover video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.detail-thumbs {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.detail-thumbs button {
+  width: 72px;
+  height: 72px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 2px solid transparent;
+  background: var(--sand);
+}
+
+.detail-thumbs button.active {
+  border-color: var(--forest);
+}
+
+.detail-thumbs img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -649,6 +705,145 @@ label {
   font-size: 12px;
 }
 
+.photo-uploader {
+  display: grid;
+  gap: 14px;
+}
+
+.uploader-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--forest-dark);
+  font-weight: 800;
+}
+
+.uploader-head div {
+  display: grid;
+  gap: 4px;
+}
+
+.uploader-head small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.upload-trigger {
+  position: relative;
+  flex-shrink: 0;
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--forest);
+  color: #fffaf1;
+  cursor: pointer;
+}
+
+.upload-trigger.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.upload-trigger input,
+.add-photo input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.photo-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.photo-grid.empty {
+  min-height: 132px;
+}
+
+.photo-tile {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 16px;
+  background: var(--sand);
+  border: 2px solid transparent;
+}
+
+.photo-tile.cover {
+  border-color: var(--coral);
+  box-shadow: 0 0 0 4px rgba(238, 99, 75, 0.14);
+}
+
+.photo-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cover-mark,
+.remove-photo {
+  position: absolute;
+  z-index: 1;
+  border-radius: 999px;
+  background: rgba(20, 46, 47, 0.76);
+  color: #fffaf1;
+  font-size: 12px;
+  font-weight: 800;
+  backdrop-filter: blur(8px);
+}
+
+.cover-mark {
+  left: 8px;
+  top: 8px;
+  padding: 5px 9px;
+}
+
+.remove-photo {
+  right: 8px;
+  bottom: 8px;
+  padding: 5px 8px;
+}
+
+.add-photo {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  border: 1px dashed rgba(30, 88, 82, 0.34);
+  color: var(--forest);
+  cursor: pointer;
+}
+
+.add-photo strong {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.add-photo span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.upload-empty {
+  position: absolute;
+  left: 124px;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .preview-travel-card {
   overflow: hidden;
 }
@@ -660,6 +855,40 @@ label {
 .preview-cover {
   aspect-ratio: 16 / 10;
   background: var(--sand);
+}
+
+.preview-cover img,
+.preview-cover video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-strip {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 0;
+  overflow-x: auto;
+}
+
+.preview-strip button {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border-radius: 14px;
+  border: 2px solid transparent;
+  background: var(--sand);
+}
+
+.preview-strip button.active {
+  border-color: var(--coral);
+}
+
+.preview-strip img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .match-board,

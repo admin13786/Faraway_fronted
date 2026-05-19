@@ -1,0 +1,73 @@
+name: Deploy Web to Aliyun
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: faraway-web-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web
+        run: npm run build
+
+      - name: Build Docker image
+        run: docker compose build web
+
+      - name: Pack web release
+        run: |
+          tar \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            -czf web-release.tar.gz .
+
+      - name: Upload release to Aliyun
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          port: 22
+          source: "web-release.tar.gz"
+          target: "${{ secrets.ALIYUN_APP_ROOT }}"
+
+      - name: Deploy on Aliyun
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ALIYUN_HOST }}
+          username: ${{ secrets.ALIYUN_USER }}
+          key: ${{ secrets.ALIYUN_SSH_KEY }}
+          port: 22
+          script: |
+            set -Eeuo pipefail
+            APP_ROOT="${{ secrets.ALIYUN_APP_ROOT }}"
+            if [ -z "$APP_ROOT" ]; then
+              echo "Missing GitHub Secret: ALIYUN_APP_ROOT" >&2
+              exit 1
+            fi
+            export APP_ROOT
+            TMP_DIR="$(mktemp -d)"
+            trap 'rm -rf "$TMP_DIR"' EXIT
+            tar -xzf "$APP_ROOT/web-release.tar.gz" -C "$TMP_DIR" scripts/deploy_web.sh
+            bash "$TMP_DIR/scripts/deploy_web.sh" "$APP_ROOT/web-release.tar.gz"
