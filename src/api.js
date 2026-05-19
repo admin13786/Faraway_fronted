@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE_URL = 'http://10.26.6.117:8088'
+const DEFAULT_API_BASE_URL = ''
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL).replace(/\/$/, '')
 const TOKEN_KEY = 'faraway_web_token'
 const USER_KEY = 'faraway_web_user'
